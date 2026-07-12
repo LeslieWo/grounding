@@ -1,0 +1,26 @@
+# ---- 个人数据：永远不进仓库 ----
+# 记忆照片 + 回忆卡片（含地点、在场的人、当时的感受）
+backend/data/
+!backend/data/README.md
+!backend/data/memories.example.json
+
+# 发作记录 / 反馈队列 / 评估日志
+*.jsonl
+
+# ---- 密钥 ----
+.env
+ios/Config.xcconfig
+ios/exportOptions.plist
+
+# ---- 构建产物 / 缓存 ----
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+DerivedData/
+*.xcodeproj/
+*.xcworkspace/
+.DS_Store
+.streamlit/
+.gstack/

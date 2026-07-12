@@ -1,0 +1,17 @@
+name: keep-alive
+
+# Render 的免费档在闲置 15 分钟后休眠，冷启动要 30-60 秒。
+# 这个工具是在恐慌发作时打开的，那 60 秒是不可接受的，所以每 5 分钟戳一次 /health。
+# 后端地址存在仓库 secret 里，不写在代码里。
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: ping /health
+        run: curl -sf "${{ secrets.BACKEND_URL }}/health" > /dev/null || true
