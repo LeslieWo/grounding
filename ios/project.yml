@@ -1,0 +1,51 @@
+name: Grounding
+options:
+  bundleIdPrefix: com.example
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    MARKETING_VERSION: "1.1"
+    CURRENT_PROJECT_VERSION: "4"
+    SWIFT_VERSION: "5.0"
+    # DEVELOPMENT_TEAM / bundle id / 后端地址 / API key 都来自 Config.xcconfig（不进仓库）
+
+targets:
+  Grounding:
+    type: application
+    platform: iOS
+    sources:
+      - Sources
+    # 个人配置（Team ID、bundle id、后端地址、API key）全在这里，这个文件不进仓库。
+    # 先把 Config.example.xcconfig 复制成 Config.xcconfig 再填。
+    configFiles:
+      Debug: Config.xcconfig
+      Release: Config.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: $(GROUNDING_BUNDLE_ID)
+        DEVELOPMENT_TEAM: $(GROUNDING_TEAM_ID)
+        TARGETED_DEVICE_FAMILY: "1"           # 只 iPhone
+        INFOPLIST_KEY_CFBundleDisplayName: 我在这儿
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: 我在这儿
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        # 后端地址和 key 从 xcconfig 注进来，代码里不写死（见 Config.swift）
+        GroundingAPIBase: $(GROUNDING_API_BASE)
+        GroundingAPIKey: $(GROUNDING_API_KEY)
+        GroundingMigrateBase: $(GROUNDING_MIGRATE_BASE)
+        # 开发期：允许连本机/局域网的 http 后端。上线走 https 就不需要了。
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        NSLocalNetworkUsageDescription: 用来连接你自己电脑上运行的陪伴后端。
+        # 只用标准 HTTPS，不含自定义加密 → 免掉 TestFlight 每次问的加密合规
+        ITSAppUsesNonExemptEncryption: false

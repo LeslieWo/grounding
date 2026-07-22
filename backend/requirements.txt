@@ -1,0 +1,7 @@
+streamlit>=1.36
+langgraph>=0.2
+langchain-openai>=0.1.20
+langchain-core>=0.2.30
+pydantic>=2.6
+pillow>=10.0
+python-dotenv>=1.0

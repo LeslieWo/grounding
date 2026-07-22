@@ -1,0 +1,20 @@
+// 复制成 Config.xcconfig 再填。Config.xcconfig 不进仓库。
+//
+// ⚠️ xcconfig 的坑：`//` 在这个格式里是注释符，所以 URL 里的 `https://` 会被截断。
+//    绕法就是下面这个 SLASH 变量 —— 别嫌丑，这是标准做法。
+SLASH = /
+
+// ---- 苹果签名 ----
+GROUNDING_TEAM_ID   = YOURTEAMID
+GROUNDING_BUNDLE_ID = com.example.grounding
+
+// ---- 后端 ----
+// agent 后端（无状态的那个）
+GROUNDING_API_BASE = https:$(SLASH)$(SLASH)your-backend.onrender.com
+// 调后端要带的 key，必须和后端 .env 里的 GROUNDING_API_KEY 一模一样
+GROUNDING_API_KEY  = 换成你自己生成的一长串随机字符串
+
+// ---- 一次性搬家（只有从旧版升级上来的人才需要）----
+// 旧后端的地址（照片还存在它上面）。第一次启动会把照片和卡片搬回手机，
+// 搬完就可以把这一行清空、并且彻底关掉那个旧服务。全新安装的人留空就行。
+GROUNDING_MIGRATE_BASE =
