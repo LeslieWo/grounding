@@ -1,7 +1,7 @@
 import Foundation
 
-/// 可信联系人：发作到危险时，agent 会把这个人端到你面前。
-/// **只存在手机本地**（UserDefaults），随请求带给后端用一次，后端不留。
+/// Trusted contact: when an episode turns dangerous, the agent will put this person right in front of you.
+/// **Stored only on the phone** (UserDefaults); carried along with each request for one-time use, and the backend keeps nothing.
 enum ContactStore {
     private static let nameKey = "trustedContactName"
     private static let noteKey = "trustedContactNote"
@@ -16,7 +16,7 @@ enum ContactStore {
         set { UserDefaults.standard.set(newValue, forKey: noteKey) }
     }
 
-    /// 没设就返回 nil —— 后端会退回到通用求助热线。
+    /// Returns nil if not set; the backend falls back to a generic help hotline.
     static var contact: Contact? {
         let n = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !n.isEmpty else { return nil }

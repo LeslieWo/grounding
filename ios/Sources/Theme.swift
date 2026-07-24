@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 视觉基调：鼠尾草绿 + 暖米白 + Baskerville 衬线，跟网页版一致，安静、温柔。
+/// Visual tone: sage green + warm off-white + Baskerville serif, matching the web version. Quiet and gentle.
 enum Theme {
     static let sage = Color(red: 0x6f / 255, green: 0x8f / 255, blue: 0x7c / 255)
     static let sageDeep = Color(red: 0x54 / 255, green: 0x70 / 255, blue: 0x5f / 255)

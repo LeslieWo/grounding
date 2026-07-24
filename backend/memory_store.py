@@ -1,5 +1,5 @@
-"""本地存储：回忆卡片存成 data/memories.json，照片存在 data/photos/。
-全部只在你自己电脑上。"""
+"""Local storage: memory cards live in data/memories.json, photos in data/photos/.
+Everything stays on your own computer."""
 import io
 import json
 import os
@@ -13,7 +13,7 @@ PHOTOS = os.path.join(DATA, "photos")
 DB = os.path.join(DATA, "memories.json")
 CONFIG = os.path.join(DATA, "config.json")
 
-# 回忆卡片的字段（中文标签 -> 存储键）
+# Memory-card fields (Chinese label -> storage key)
 FIELDS = [
     ("小标题", "title"),
     ("地点（在哪）", "where"),
@@ -47,11 +47,11 @@ def load_memories():
 
 
 def upright_bytes(image_bytes, ext=".jpg"):
-    """按 EXIF 方向把照片摆正，并把方向"烧"进像素（去掉 EXIF 标签）。
-    手机照片常把方向存在标签里、像素没转，不摆正显示就会歪/倒。"""
+    """Upright the photo per its EXIF orientation and "bake" the orientation into the pixels (stripping the EXIF tag).
+    Phone photos often keep orientation in the tag without rotating the pixels; displayed un-uprighted they come out sideways or upside down."""
     try:
         im = Image.open(io.BytesIO(image_bytes))
-        im = ImageOps.exif_transpose(im)          # 按 EXIF 真正旋转像素
+        im = ImageOps.exif_transpose(im)          # Actually rotate the pixels per EXIF
         buf = io.BytesIO()
         if ext.lower() == ".png":
             im.save(buf, format="PNG")
@@ -59,17 +59,17 @@ def upright_bytes(image_bytes, ext=".jpg"):
             im.convert("RGB").save(buf, format="JPEG", quality=92)
         return buf.getvalue()
     except Exception:
-        return image_bytes                        # 处理不了就原样存，别让保存挂掉
+        return image_bytes                        # If it can't be processed, store as-is — don't let saving die
 
 
 def save_memory(chunk, image_bytes, ext=".jpg"):
-    """新建或覆盖一段回忆。chunk 是 dict；image_bytes 是照片原始字节。"""
+    """Create or overwrite a memory. chunk is a dict; image_bytes is the photo's raw bytes."""
     _ensure()
     mid = chunk.get("id") or uuid.uuid4().hex[:8]
     chunk["id"] = mid
     img_name = f"{mid}{ext}"
     if image_bytes is not None:
-        image_bytes = upright_bytes(image_bytes, ext)   # 存进去就是正的
+        image_bytes = upright_bytes(image_bytes, ext)   # Stored upright from the start
         with open(os.path.join(PHOTOS, img_name), "wb") as f:
             f.write(image_bytes)
         chunk["image_path"] = os.path.join("data", "photos", img_name)
@@ -91,7 +91,7 @@ def delete_memory(mid):
     mems = [m for m in load_memories() if m.get("id") != mid]
     with open(DB, "w", encoding="utf-8") as f:
         json.dump(mems, f, ensure_ascii=False, indent=2)
-    # 顺手删掉照片
+    # Delete the photo while we're at it
     for ext in (".jpg", ".jpeg", ".png", ".webp"):
         p = os.path.join(PHOTOS, f"{mid}{ext}")
         if os.path.exists(p):
@@ -102,14 +102,14 @@ def delete_memory(mid):
 
 
 def image_abspath(rel_path):
-    """把存储的相对路径转成绝对路径，方便 Streamlit 显示。"""
+    """Turn the stored relative path into an absolute one, so Streamlit can display it."""
     if not rel_path:
         return None
     p = os.path.join(BASE, rel_path)
     return p if os.path.exists(p) else None
 
 
-# ---- 可信联系人（发作时一键联系一个真人）----
+# ---- Trusted contact (one tap to reach a real person during an episode) ----
 def load_config():
     _ensure()
     if os.path.exists(CONFIG):

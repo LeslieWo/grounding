@@ -22,12 +22,12 @@ struct RootView: View {
                     }
                     ToolbarItem(placement: .topBarLeading) {
                         Button { showHistory = true } label: {
-                            Image(systemName: "clock.arrow.circlepath")   // 历史
+                            Image(systemName: "clock.arrow.circlepath")   // history
                         }.tint(Theme.sage)
                     }
                     ToolbarItem(placement: .topBarLeading) {
                         Button { showLibrary = true } label: {
-                            Image(systemName: "photo.on.rectangle.angled") // 记忆库
+                            Image(systemName: "photo.on.rectangle.angled") // memory library
                         }.tint(Theme.sage)
                     }
                     ToolbarItem(placement: .topBarTrailing) {
@@ -43,8 +43,9 @@ struct RootView: View {
                 .sheet(isPresented: $showHistory) { HistoryView() }
         }
         .tint(Theme.sage)
-        // 第一次装上这个版本时，把照片和卡片从旧后端搬回手机。搬完旧服务就能关掉，
-        // 照片从此不在任何云上。之后每次启动这里都直接跳过（有个一次性标记）。
+        // On the first launch of this version, move photos and cards from the old backend back to the phone.
+        // Once done, the old service can be shut down and the photos are on no cloud from then on.
+        // Every later launch skips straight past this (there's a one-time flag).
         .task { await library.migrateIfNeeded() }
     }
 }

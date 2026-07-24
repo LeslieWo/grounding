@@ -1,15 +1,18 @@
-"""着陆陪伴 —— FastAPI 后端（无状态的 agent 大脑）。
+"""Grounding Companion — FastAPI backend (the stateless agent brain).
 
-设计红线：**服务器不存任何个人数据。**
-照片和回忆卡片都只在你手机上。每一轮，客户端把"这次对话的状态 + 记忆库卡片"一起发过来，
-后端跑一轮 agent 循环、把话说回去，什么都不落盘。所以就算这台服务器被攻破，也没有东西可拿。
+Design red line: **the server stores no personal data whatsoever.**
+Photos and memory cards live only on your phone. Each turn, the client sends up
+"this conversation's state + the memory-bank cards" together; the backend runs one
+agent loop, says its piece back, and writes nothing to disk. So even if this server
+gets compromised, there is nothing to take.
 
-agent 从头到尾**只读卡片的文字**（标题/场景/感官/情绪），从不看照片像素——
-这正是照片可以完全不上云的原因。唯一会看到照片的地方是 /api/ingest（建卡片时视觉模型看一次），
-那张照片也只是穿过内存，不落盘。
+From start to finish the agent reads **only the cards' text** (title/scene/senses/emotion)
+and never looks at photo pixels — which is exactly why photos never need to touch the cloud.
+The only place a photo is ever seen is /api/ingest (the vision model looks once while
+drafting a card), and even that photo just passes through memory, never landing on disk.
 
-本地起：  .venv/bin/uvicorn api:app --reload --host 0.0.0.0 --port 8000
-健康检查：curl http://localhost:8000/health
+Run locally:  .venv/bin/uvicorn api:app --reload --host 0.0.0.0 --port 8000
+Health check: curl http://localhost:8000/health
 """
 import hmac
 import os
@@ -28,30 +31,31 @@ from llm_config import get_model_name
 
 app = FastAPI(title="Grounding Agent API")
 
-# 只有 app 自己调它。留 CORS 是为了浏览器端调试；真正的门是下面的 API key。
+# Only the app itself calls this. CORS stays on for browser-side debugging; the real gate is the API key below.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"], allow_methods=["*"], allow_headers=["*"],
 )
 
 
-# ---------- 门禁 ----------
-# 没有 key 就打不动这个后端。理由很实在：/api/turn 每次都在花钱调 LLM，
-# 而且发作时的原话会经过这里——不能让任何人随便戳。
+# ---------- Gatekeeping ----------
+# No key, no access to this backend. The reason is very practical: every /api/turn call
+# spends money on an LLM, and someone's raw words mid-episode pass through here —
+# nobody gets to poke at it freely.
 API_KEY = os.environ.get("GROUNDING_API_KEY", "")
 REQUIRE_KEY = os.environ.get("REQUIRE_API_KEY", "1").strip() not in ("0", "false", "False", "no")
 
 
 def require_key(x_api_key: str = Header(default="")):
     if not REQUIRE_KEY:
-        return                      # 本地开发可以关掉（.env 里 REQUIRE_API_KEY=0）
+        return                      # Can be turned off for local dev (REQUIRE_API_KEY=0 in .env)
     if not API_KEY:
         raise HTTPException(500, "服务器没配 GROUNDING_API_KEY")
-    if not hmac.compare_digest(x_api_key or "", API_KEY):   # 定长比较，防时序侧信道
+    if not hmac.compare_digest(x_api_key or "", API_KEY):   # Constant-time comparison, guards against timing side channels
         raise HTTPException(401, "unauthorized")
 
 
-# ---------- 数据模型 ----------
+# ---------- Data models ----------
 class Msg(BaseModel):
     role: str            # "me" | "companion"
     text: str
@@ -69,16 +73,16 @@ class Contact(BaseModel):
 
 class TurnIn(BaseModel):
     user_text: str
-    memories: List[dict] = []        # ★ 记忆库卡片，由客户端（手机）带上来。服务器不存。
-    history: List[Msg] = []          # 之前的对话（不含这次 user_text）
-    memory_id: Optional[str] = None  # 当前照片 id；首轮传 null
+    memories: List[dict] = []        # ★ Memory-bank cards, carried up by the client (the phone). The server stores none.
+    history: List[Msg] = []          # Prior conversation (not including this user_text)
+    memory_id: Optional[str] = None  # Current photo id; null on the first turn
     shown_ids: List[str] = []
-    turn: int = 0                    # 首轮 0
+    turn: int = 0                    # 0 on the first turn
     covered: List[str] = []
     arm: str = "agent"
-    avoid: List[Avoid] = []          # 用户 👎 过的话（即时 RLHF），可空
-    avoid_recent: List[str] = []     # 最近几次发作已经看过的照片 id，开场避开，防止总看同一张而麻木
-    contact: Optional[Contact] = None  # 可信联系人；危机时才用到。服务器不存。
+    avoid: List[Avoid] = []          # Lines the user has 👎'd (instant RLHF); may be empty
+    avoid_recent: List[str] = []     # Photo ids already seen in recent episodes; skip them at the opening so the same photo doesn't get numbing from overuse
+    contact: Optional[Contact] = None  # Trusted contact; only used in a crisis. The server stores none.
 
 
 class MemoryOut(BaseModel):
@@ -91,7 +95,7 @@ class TurnOut(BaseModel):
     memory: Optional[MemoryOut] = None
     shown_ids: List[str]
     covered: List[str]
-    turn: int                        # 客户端下一轮该用的 turn（已 +1）
+    turn: int                        # The turn the client should use next round (already +1)
     action: str
     done: bool
     photo_changed: bool
@@ -107,18 +111,18 @@ def _mem_out(m: dict) -> Optional[MemoryOut]:
     return MemoryOut(id=m["id"], title=m.get("title", "") or "")
 
 
-# ---------- 端点 ----------
+# ---------- Endpoints ----------
 @app.get("/health")
 def health():
-    """保活用，不需要 key。只说服务在、用的哪个模型——不透露任何个人信息。"""
+    """Keep-alive; no key required. Only says the service is up and which model it runs — reveals nothing personal."""
     return {"ok": True, "model": get_model_name(), "stateless": True}
 
 
 @app.post("/api/turn", response_model=TurnOut, dependencies=[Depends(require_key)])
 def turn(inp: TurnIn):
-    """跑一轮 agent 循环。首轮(memory_id=null)会读你此刻的感受挑一张开场照片。
+    """Run one agent loop. On the first turn (memory_id=null) it reads how you feel right now and picks an opening photo.
 
-    记忆库(inp.memories)由客户端带上来——服务器这边没有、也不需要有任何照片。
+    The memory bank (inp.memories) is carried up by the client — the server has no photos here, and needs none.
     """
     mems = inp.memories or []
     if not mems:
@@ -130,8 +134,9 @@ def turn(inp: TurnIn):
 
     first = inp.memory_id is None
     if first:
-        # 读感受挑开场照片，但避开最近几次已经看过的（防止每次发作都看同一张而脱敏）。
-        # pick_memory 里若排除后候选太少会自动回落到全库，所以不怕 avoid_recent 太长。
+        # Read the feeling and pick an opening photo, but skip ones seen in recent episodes
+        # (so it's not the same photo every episode until it desensitizes).
+        # pick_memory falls back to the full bank if exclusions leave too few candidates, so a long avoid_recent is harmless.
         mem = pick_memory(mems, inp.user_text, exclude_ids=inp.avoid_recent)
         shown = [mem.get("id")]
         turn_n, covered = 0, []
@@ -175,10 +180,10 @@ def turn(inp: TurnIn):
 
 @app.post("/api/ingest", dependencies=[Depends(require_key)])
 async def ingest(file: UploadFile = File(...)):
-    """上传一张照片 → 用视觉模型起草一张"回忆卡片"草稿，直接返回给客户端。
+    """Upload a photo → the vision model drafts a "memory card" and it goes straight back to the client.
 
-    照片**只穿过内存**：看一眼、起草卡片、丢掉。服务器不写盘、不留副本。
-    客户端拿到草稿后自己补充、自己存在手机上。
+    The photo **only passes through memory**: one look, draft the card, drop it. The server writes nothing to disk and keeps no copy.
+    The client takes the draft, fills it in, and stores it on the phone itself.
     """
     data = await file.read()
     try:

@@ -52,7 +52,7 @@ struct ChatView: View {
     }
 }
 
-// MARK: - 呼吸背景（缓慢明暗，像一次次深呼吸）
+// MARK: - Breathing background (slowly brightening and dimming, like one deep breath after another)
 
 struct BreathingBackground: View {
     @State private var breathe = false
@@ -71,7 +71,7 @@ struct BreathingBackground: View {
     }
 }
 
-// MARK: - 开场问候（还没说话时，AI 先温柔打招呼）
+// MARK: - Opening greeting (before anything is said, the AI gently says hello first)
 
 struct GreetingBubble: View {
     var body: some View {
@@ -88,7 +88,7 @@ struct GreetingBubble: View {
     }
 }
 
-// MARK: - 一条消息（我方靠右 / 陪伴靠左，陪伴消息上方可带照片）
+// MARK: - One message (mine on the right / companion on the left; companion messages can carry a photo on top)
 
 struct MessageRow: View {
     let msg: ChatMsg
@@ -118,7 +118,7 @@ struct MessageRow: View {
                         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                         .shadow(color: .black.opacity(0.04), radius: 6, y: 2)
                     if let t = msg.think {
-                        ThinkDisclosure(think: t)   // 轻轻一点看"它怎么想的"
+                        ThinkDisclosure(think: t)   // a gentle tap to see "what it was thinking"
                     }
                 }
                 Spacer(minLength: 40)
@@ -130,14 +130,14 @@ struct MessageRow: View {
 struct PhotoView: View {
     let id: String
     var body: some View {
-        LocalPhoto(id: id)                          // 本地优先，秒开；只第一次从云上下载
+        LocalPhoto(id: id)                          // local-first, opens instantly; downloads from the cloud only the first time
             .frame(maxWidth: 260, maxHeight: 300)
             .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
             .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 }
 
-// MARK: - 危机卡片（检测到危险时置顶）
+// MARK: - Crisis card (pinned to the top when danger is detected)
 
 struct CrisisCard: View {
     let crisis: Crisis
@@ -164,7 +164,7 @@ struct CrisisCard: View {
     }
 }
 
-// MARK: - "对方正在输入" 三点
+// MARK: - "They're typing" three dots
 
 struct TypingDots: View {
     @State private var on = false
@@ -184,7 +184,7 @@ struct TypingDots: View {
     }
 }
 
-// MARK: - 底部输入栏
+// MARK: - Bottom input bar
 
 struct InputBar: View {
     @ObservedObject var model: ChatModel
@@ -220,7 +220,7 @@ struct InputBar: View {
     }
 }
 
-// MARK: - "它怎么想的"（可展开，藏起来不打扰发作时的对话）
+// MARK: - "What it was thinking" (expandable; tucked away so it doesn't intrude on the conversation during an episode)
 
 struct ThinkDisclosure: View {
     let think: ThinkInfo

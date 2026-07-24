@@ -1,14 +1,14 @@
 import Foundation
 
-// 跟后端 api.py 的 pydantic 模型一一对应。
+// One-to-one with the pydantic models in the backend's api.py.
 
 struct Msg: Codable {
     let role: String     // "me" | "companion"
     let text: String
 }
 
-/// 一张完整的回忆卡片。**这是个人数据，只存在手机上。**
-/// 每一轮对话由客户端把整个记忆库发给后端；后端跑完就忘，不落盘。
+/// One complete memory card. **This is personal data; it lives only on the phone.**
+/// Each conversation turn the client sends the whole memory library to the backend; the backend forgets it once the turn is done and never writes it to disk.
 struct MemoryCard: Codable, Identifiable, Equatable {
     var id: String
     var title: String = ""
@@ -25,7 +25,7 @@ struct MemoryCard: Codable, Identifiable, Equatable {
     var emotion: String = ""
     var grounding_questions: [String] = []
 
-    // 后端字段名是 where —— 在 Swift 里是关键字，所以映射成 whereText
+    // The backend field is named `where`, a keyword in Swift, so it maps to whereText
     enum CodingKeys: String, CodingKey {
         case id, title, when, who, what_happened, see, hear, touch
         case smell_taste, weather_temp, food, emotion, grounding_questions
@@ -34,8 +34,8 @@ struct MemoryCard: Codable, Identifiable, Equatable {
 
     init(id: String) { self.id = id }
 
-    /// 宽容解码：视觉模型起草的草稿卡片**没有 id**，别的字段也可能缺。
-    /// 缺什么就用空值，绝不因为少一个字段就整张卡片解不出来。
+    /// Lenient decoding: draft cards from the vision model **have no id**, and other fields may be missing too.
+    /// Whatever is missing gets an empty value; never let one absent field make the whole card undecodable.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         func s(_ k: CodingKeys) -> String { ((try? c.decodeIfPresent(String.self, forKey: k)) ?? nil) ?? "" }
@@ -56,7 +56,7 @@ struct MemoryCard: Codable, Identifiable, Equatable {
     }
 }
 
-/// 后端回给客户端的"当前这张是哪张"——只有 id 和标题，不含任何图片地址。
+/// The backend's answer to "which photo is current": just the id and title, no image URL of any kind.
 struct MemoryOut: Codable {
     let id: String
     let title: String
@@ -74,7 +74,7 @@ struct Contact: Codable {
 
 struct TurnIn: Codable {
     let user_text: String
-    let memories: [MemoryCard]   // ★ 记忆库随请求带上去；服务器不存
+    let memories: [MemoryCard]   // ★ the memory library rides along with the request; the server stores nothing
     let history: [Msg]
     let memory_id: String?
     let shown_ids: [String]
@@ -82,7 +82,7 @@ struct TurnIn: Codable {
     let covered: [String]
     let arm: String
     let avoid: [Avoid]
-    let avoid_recent: [String]   // 最近几次发作看过的照片 id（存在手机上，跨 session），开场避开
+    let avoid_recent: [String]   // photo ids seen during recent episodes (stored on the phone, across sessions); avoid them at the start
     let contact: Contact?
 }
 
@@ -104,10 +104,10 @@ struct TurnOut: Codable {
     let crisis: Crisis?
     let emotional_read: String
     let pick_reason: String
-    let reasoning: String?      // 为什么这么决定（可选，后端旧版没有也不会崩）
+    let reasoning: String?      // why it decided this (optional; older backends without it won't crash us)
 }
 
-/// /api/ingest 的返回：视觉模型起草的卡片草稿（还没入库，等你补充确认）。
+/// Response from /api/ingest: the card draft the vision model wrote (not yet in the library; waiting for you to fill in and confirm).
 struct IngestOut: Codable {
     let draft: MemoryCard
 }

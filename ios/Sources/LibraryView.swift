@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 记忆库：你存进来的那些美好照片。**全部在这台手机上**，服务器一张都没有。
+/// The memory library: the treasured photos you've saved. **All of them live on this phone**; the server has not a single one.
 struct LibraryView: View {
     @EnvironmentObject private var library: LibraryStore
     @Environment(\.dismiss) private var dismiss
@@ -54,7 +54,7 @@ struct LibraryView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button { showContact = true } label: {
-                        Image(systemName: "heart.text.square")     // 可信联系人
+                        Image(systemName: "heart.text.square")     // trusted contact
                     }.tint(Theme.sage)
                 }
                 ToolbarItem(placement: .topBarTrailing) {
@@ -70,7 +70,7 @@ struct LibraryView: View {
     }
 }
 
-/// 可信联系人：发作到危险的时候，agent 会把这个人端到你面前。只存在这台手机上。
+/// Trusted contact: when an episode turns dangerous, the agent will put this person right in front of you. Stored only on this phone.
 struct ContactView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name = ContactStore.name

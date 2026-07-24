@@ -1,10 +1,13 @@
-"""🕊️ 着陆陪伴 · Grounding Companion —— Streamlit 界面。
-启动： streamlit run app.py
+"""🕊️ Grounding Companion -- the Streamlit interface.
+Launch: streamlit run app.py
 
-交互方向：
-- 记忆银行：你一次性传进一堆珍藏的好照片，AI 自动看懂、悄悄建库，不用你描述。
-- 着陆陪伴：难受时你先说一句此刻的困难，AI 会从你的记忆库里挑一张照片放到你面前，
-  一句一句陪你回忆，慢慢让你感到——闪回不是永恒的。
+Interaction design:
+- Memory bank: you upload a batch of treasured photos in one go; the AI reads
+  them itself and quietly builds the library -- no descriptions needed from you.
+- Grounding companionship: when you're struggling, you first say one line about
+  what's hard right now; the AI picks a photo from your memory bank and places
+  it in front of you, keeping you company through the memory line by line,
+  slowly letting you feel -- the flashback is not forever.
 """
 import os
 import time
@@ -21,7 +24,7 @@ load_dotenv()
 
 st.set_page_config(page_title="着陆陪伴", page_icon="🕊️", layout="centered")
 
-# ---------- 现代、克制、平静的样式 ----------
+# ---------- Modern, restrained, calm styling ----------
 st.markdown(
     """
     <style>
@@ -106,7 +109,8 @@ def _gentle_error(e):
 
 
 def _render_chat(history):
-    """把整段对话渲染成聊天气泡：你在右(彩色)，陪伴者在左(白色)。"""
+    """Render the whole conversation as chat bubbles: you on the right (colored),
+    the companion on the left (white)."""
     rows = []
     for h in history:
         cls = "me" if h.get("role") == "me" else "assistant"
@@ -116,22 +120,28 @@ def _render_chat(history):
 
 
 def _pick_memory(mems, exclude_ids=None):
-    """AI 自动挑一张照片：优先挑这次还没看过的；都看过了就从全部里挑一张。"""
+    """AI auto-picks a photo: prefer ones not yet shown this session; if all have
+    been shown, pick from the full set."""
     exclude_ids = set(exclude_ids or [])
     pool = [m for m in mems if m.get("id") not in exclude_ids] or mems
     return random.choice(pool)
 
 
-# 反馈队列：你随手记，等你跟我说"处理反馈"时我一起过一遍、直接改代码、撞墙写 wall-log。
+# Feedback queue: you jot things down as you go; when you tell me "process the
+# feedback" I go through them all at once, change the code directly, and write
+# a wall-log when I hit a wall.
 FEEDBACK_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "feedback.jsonl")
 
-# RLHF 偏好数据：你对每句 AI 的话点 👍/👎，连同 agent 当时的决策一起存下来。
-# 这就是 RLHF/DPO 的燃料——攒够了可以塞回 prompt 当反面教材，或以后微调模型。
+# RLHF preference data: you 👍/👎 each line the AI says, stored together with the
+# agent's decision at that moment. This is the fuel for RLHF/DPO -- once enough
+# accumulates it can be fed back into the prompt as negative examples, or used
+# to fine-tune the model later.
 RLHF_LOG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rlhf.jsonl")
 
 
 def _log_rlhf(rating, idx, history, memory, note=""):
-    """记一条偏好：rating=good/bad；note=你说的"为什么不好"；连同那句话、agent 决策、上下文一起存。"""
+    """Log one preference: rating=good/bad; note=your "why it's bad"; stored
+    together with that line, the agent's decision, and the context."""
     import json
     entry = history[idx] if 0 <= idx < len(history) else {}
     prev_user = ""
@@ -142,9 +152,9 @@ def _log_rlhf(rating, idx, history, memory, note=""):
     rec = {
         "ts": time.strftime("%Y-%m-%d %H:%M", time.localtime()),
         "rating": rating,
-        "note": note.strip(),                       # 你写的"哪里不好"
+        "note": note.strip(),                       # The "what's wrong with it" you wrote
         "companion_text": entry.get("text", ""),
-        "decision": entry.get("meta", {}),          # agent 当时的 action/focus/emotional_read/reasoning
+        "decision": entry.get("meta", {}),          # The agent's action/focus/emotional_read/reasoning at the time
         "prev_user": prev_user,
         "photo": {"id": (memory or {}).get("id", ""), "title": (memory or {}).get("title", "")},
     }
@@ -153,7 +163,8 @@ def _log_rlhf(rating, idx, history, memory, note=""):
 
 
 def _recent_bad_examples(limit=5):
-    """读最近被 👎 的话+原因，喂给陪伴者当反面教材（即时 RLHF）。"""
+    """Read the recently 👎'd lines + reasons, fed to the companion as negative
+    examples (instant RLHF)."""
     import json
     if not os.path.exists(RLHF_LOG):
         return []
@@ -178,13 +189,13 @@ def _save_feedback(text, where=""):
         "ts": time.strftime("%Y-%m-%d %H:%M", time.localtime()),
         "where": where,
         "text": text.strip(),
-        "done": False,   # 我处理完会把它标成 True
+        "done": False,   # I flip this to True once I've handled it
     }
     with open(FEEDBACK_LOG, "a", encoding="utf-8") as f:
         f.write(json.dumps(rec, ensure_ascii=False) + "\n")
 
 
-# ---------- 侧边栏 ----------
+# ---------- Sidebar ----------
 with st.sidebar:
     st.markdown("### 🕊️ 着陆陪伴")
     mode = st.radio("现在想做什么？", ["🕊️ 着陆陪伴", "📷 记忆银行", "📊 我的存档"], label_visibility="collapsed")
@@ -212,7 +223,7 @@ with st.sidebar:
             st.success("记下了 🤍 下次说“处理反馈”，我就来改。")
         else:
             st.warning("先写点什么再记哦。")
-    # 让你看到还有几条没处理
+    # Show you how many are still waiting to be handled
     if os.path.exists(FEEDBACK_LOG):
         import json as _json
         pending = 0
@@ -228,7 +239,7 @@ with st.sidebar:
             st.caption(f"📥 还有 {pending} 条反馈等我处理")
 
 
-# ================= 模式一：着陆陪伴 =================
+# ================= Mode 1: grounding companionship =================
 def render_grounding():
     mems = ms.load_memories()
     if not mems:
@@ -241,7 +252,7 @@ def render_grounding():
     id2mem = {m.get("id"): m for m in mems}
 
     def _apply(res):
-        """把 agent 这一轮的产出落进对话。"""
+        """Land the agent's output for this turn into the conversation."""
         ss.g_memory = res["memory"]
         ss.g_shown = res["shown_ids"]
         ss.g_covered = res["covered"]
@@ -266,7 +277,8 @@ def render_grounding():
         tr = res.get("tool_result") or {}
         if tr.get("kind") == "trusted_contact":
             ss.g_crisis = tr
-        # agent 自己收尾 → 悄悄记进存档，不打断对话
+        # The agent wound down on its own -> quietly record it into the
+        # archive without interrupting the conversation
         if res["done"] and not ss.get("g_ended"):
             ss.g_ended = True
             try:
@@ -277,7 +289,8 @@ def render_grounding():
                 pass
 
     def _run_turn(user_text):
-        """跑一轮。第一句话自动开新 session（读情绪、挑照片、记 start），之后继续。"""
+        """Run one turn. The first message auto-starts a new session (read the
+        emotion, pick a photo, log start); afterwards it just continues."""
         from grounding_graph import next_turn, pick_memory
         first = not ss.get("g_started")
         ss.g_history = list(ss.get("g_history", [])) + [{"role": "me", "text": user_text}]
@@ -289,7 +302,7 @@ def render_grounding():
                     ss.g_session_id = ev.new_session_id()
                     ss.g_turn = 0
                     ss.g_covered = []
-                    mem = pick_memory(mems, user_text)          # 读你此刻的感受挑照片
+                    mem = pick_memory(mems, user_text)          # Pick a photo by reading how you feel right now
                     ss.g_memory = mem
                     ss.g_shown = [mem.get("id")]
                     ss.g_pick_reason = mem.get("_pick_reason", "")
@@ -308,7 +321,7 @@ def render_grounding():
         except Exception as e:
             _gentle_error(e)
 
-    # 顶部：标题 + “新的一次”（像 ChatGPT 的 New chat）
+    # Top: title + "start anew" (like ChatGPT's New chat)
     c_title, c_new = st.columns([4, 1])
     c_title.markdown("# 🕊️ 我在这儿")
     if ss.get("g_history") and c_new.button("新的一次"):
@@ -316,7 +329,7 @@ def render_grounding():
             ss.pop(k, None)
         st.rerun()
 
-    # 危机卡片：一直置顶
+    # Crisis card: always pinned at the top
     cri = ss.get("g_crisis")
     if cri:
         name = cri.get("contact_name", "")
@@ -329,7 +342,7 @@ def render_grounding():
             unsafe_allow_html=True,
         )
 
-    # 空状态：AI 先打个招呼（像 ChatGPT 新对话）
+    # Empty state: the AI says hello first (like a fresh ChatGPT conversation)
     if not ss.get("g_history"):
         st.markdown(
             '<div class="chat"><div class="bubble assistant">我在。<br>'
@@ -337,7 +350,8 @@ def render_grounding():
             unsafe_allow_html=True,
         )
 
-    # 对话流：照片内嵌在"引入它的那句 AI 消息"上；每句 AI 带 👍/👎
+    # Conversation flow: each photo is embedded on "the AI message that introduced
+    # it"; every AI line carries 👍/👎
     hist = ss.get("g_history", [])
     last_photo = None
     for i, h in enumerate(hist):
@@ -372,7 +386,7 @@ def render_grounding():
                     ss[f"why_{i}"] = False
                     st.rerun()
 
-    # AI 的思考 + 呼吸（收起来，不打扰）
+    # The AI's thinking + breathing (tucked away, non-intrusive)
     dec = ss.get("g_decision", {})
     if dec.get("emotional_read"):
         _act_zh = {"ask": "继续陪你聊", "switch_photo": "换一张照片", "summarize": "回顾这一路",
@@ -383,17 +397,19 @@ def render_grounding():
             st.markdown(f"- **为什么**：{dec.get('reasoning','')}")
             if dec.get("pick_reason"):
                 st.markdown(f"- **我为什么挑这张照片**：{dec.get('pick_reason','')}")
-    # 呼吸光晕：淡淡浮在背景，跟着它的涨落一起呼吸就好
+    # Breathing halo: floats faintly in the background; just breathe along
+    # with its rise and fall
     st.markdown('<div class="breathe-ring"></div>', unsafe_allow_html=True)
 
-    # 唯一入口：底部固定聊天框。第一句就是开始，不用表单、不用滑块。
+    # The one and only entry point: a chat box fixed at the bottom. The first
+    # message is the start -- no forms, no sliders.
     user_text = st.chat_input("跟我说说，此刻你在经历什么……")
     if user_text and user_text.strip():
         _run_turn(user_text.strip())
         st.rerun()
 
 
-# ================= 模式二：记忆银行（批量上传，自动建库） =================
+# ================= Mode 2: memory bank (batch upload, auto library-building) =================
 def render_bank():
     st.markdown("# 📷 记忆银行")
     st.markdown(
@@ -437,7 +453,7 @@ def render_bank():
                     st.info(f"有 {fail} 张没成功，可以待会儿再试一次。")
                 st.rerun()
 
-    # 已有的回忆
+    # Existing memories
     mems = ms.load_memories()
     if mems:
         st.markdown("---")
@@ -460,7 +476,7 @@ def render_bank():
                         st.rerun()
 
 
-# ================= 模式三：我的存档（康复档案 + 诚实的起效检查） =================
+# ================= Mode 3: my archive (recovery record + an honest efficacy check) =================
 REFLECT_SYS = """你在温柔地帮一个有 PTSD、会经历恐慌发作的人，回看 ta 自己的康复记录。
 下面是 ta 每次发作时选了哪些照片、难受度降了多少、发作时最先说的话的汇总。
 
@@ -494,14 +510,14 @@ def render_archive():
         st.info("还没有记录呢。等你第一次用过 **🕊️ 着陆陪伴**，这里就会长出你的第一段存档。")
         return
 
-    # --- 趋势：每次难受度降了多少 ---
+    # --- Trend: how much distress dropped each time ---
     if completed:
         st.markdown("### 📉 每一次，你都降下来了多少")
         st.line_chart({"难受度下降": [s["relief"] for s in completed]})
         avg = sum(s["relief"] for s in completed) / len(completed)
         st.markdown(f'<span class="soft">走完全程 {len(completed)} 次，平均每次难受度降了 {avg:.1f} 分（满分 10）。</span>', unsafe_allow_html=True)
 
-    # --- AI 帮你看模式 ---
+    # --- AI helps you spot patterns ---
     st.markdown("### 🔍 你真正需要的，也许藏在这些记录里")
     if len(completed) < 3:
         st.caption(f"再攒几次（现在 {len(completed)} 次），AI 就能帮你横着看出模式了。")
@@ -517,7 +533,7 @@ def render_archive():
             except Exception as e:
                 _gentle_error(e)
 
-    # --- 每一次发作的卡片 ---
+    # --- One card per episode ---
     st.markdown("### 🗂️ 一次一次翻回去")
     for s in reversed(sessions):
         pre, post = s.get("pre_suds"), s.get("post_suds")
@@ -538,7 +554,7 @@ def render_archive():
                 who = "🫂 我" if h.get("role") == "me" else "🕊️ 陪伴者"
                 st.markdown(f"**{who}**：{h.get('text','')}")
 
-    # --- 诚实的起效检查（A/B）---
+    # --- An honest efficacy check (A/B) ---
     with st.expander("🔬 起效检查：它真的比随机好吗？（诚实的 A/B）"):
         rep = ev.analyze()
         st.caption("每次发作被盲分到「随机塞一张」或「聪明选片」。回归均值对两臂一样，所以聪明臂高出随机臂的那部分，才是真效果。")

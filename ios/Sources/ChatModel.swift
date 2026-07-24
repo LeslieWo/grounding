@@ -1,13 +1,13 @@
 import SwiftUI
 
-/// agent 这一轮"怎么想的"（后端本来就传，之前没显示）。
+/// What the agent was "thinking" this turn (the backend always sent this; we just never showed it before).
 struct ThinkInfo: Codable {
-    let emotionalRead: String     // 读到的情绪
+    let emotionalRead: String     // the emotion it read
     let action: String            // ask / switch_photo / summarize / offer_end / farewell / use_tool
-    let pickReason: String        // 为什么选/换这张照片
-    let reasoning: String         // 为什么这么决定
+    let pickReason: String        // why it picked / switched to this photo
+    let reasoning: String         // why it decided this
 
-    /// 把动作代码翻成人话
+    /// Translate the action code into plain language
     var actionCN: String {
         switch action {
         case "ask": return "继续温柔地问"
@@ -21,7 +21,7 @@ struct ThinkInfo: Codable {
     }
 }
 
-/// 界面上的一条消息。可 Codable，用来存历史。
+/// One message in the UI. Codable so it can be saved to history.
 struct ChatMsg: Identifiable, Codable {
     var id = UUID()
     let role: String            // "me" | "companion"
@@ -30,8 +30,8 @@ struct ChatMsg: Identifiable, Codable {
     var think: ThinkInfo? = nil
 }
 
-/// 这次对话的全部状态、以及整个记忆库，都在客户端。
-/// 后端是无状态的：每一轮我们把状态 + 记忆库卡片一起发过去，它跑完就忘。
+/// All of this conversation's state, plus the entire memory library, lives on the client.
+/// The backend is stateless: each turn we send the state + memory cards along; once it finishes the turn, it forgets.
 @MainActor
 final class ChatModel: ObservableObject {
     @Published var messages: [ChatMsg] = []
@@ -41,24 +41,24 @@ final class ChatModel: ObservableObject {
     @Published var done = false
     @Published var errorText: String? = nil
 
-    /// 记忆库（照片 + 卡片都在手机上）。发请求时随身带上去。
+    /// The memory library (photos + cards both live on the phone). Carried along with every request.
     private let library: LibraryStore
     init(library: LibraryStore) { self.library = library }
 
-    // 发回后端的对话状态
+    // Conversation state sent back to the backend
     private var memoryId: String? = nil
     private var shownIds: [String] = []
     private var turn = 0
     private var covered: [String] = []
 
-    // 这次对话在历史里的 id（每次「新的一次」换一个）
+    // This conversation's id in history (a fresh one for every "start over")
     private var sessionId = UUID()
 
-    // 跨 session 记住"最近看过哪些照片"（存手机，重启也在），开场避开，防止每次发作都看同一张而麻木。
+    // Remember "which photos were seen recently" across sessions (stored on the phone, survives restarts); avoid them at the start of a session, so she doesn't see the same photo every episode and grow numb to it.
     private let recentKey = "recentShownIds"
     private var recentShown: [String] {
         get { UserDefaults.standard.stringArray(forKey: recentKey) ?? [] }
-        set { UserDefaults.standard.set(Array(newValue.suffix(12)), forKey: recentKey) }  // 只留最近 12 张
+        set { UserDefaults.standard.set(Array(newValue.suffix(12)), forKey: recentKey) }  // keep only the most recent 12
     }
     private func recordShown(_ id: String?) {
         guard let id, !id.isEmpty else { return }
@@ -66,7 +66,7 @@ final class ChatModel: ObservableObject {
     }
 
     func reset() {
-        // 开新的一次之前，当前这次已经在每轮自动存过历史了，直接换新 session 即可
+        // Before starting a new session, the current one has already been auto-saved to history every turn, so just switch to a new session
         messages = []
         input = ""
         sending = false
@@ -94,11 +94,11 @@ final class ChatModel: ObservableObject {
 
         Task {
             do {
-                // history = 这条 user 消息之前的所有消息
+                // history = every message before this user message
                 let hist = messages.dropLast().map { Msg(role: $0.role, text: $0.text) }
                 let body = TurnIn(
                     user_text: text,
-                    memories: library.cards,          // ★ 记忆库随请求上去，服务器不存
+                    memories: library.cards,          // ★ memory library goes up with the request; the server stores nothing
                     history: Array(hist),
                     memory_id: memoryId,
                     shown_ids: shownIds,
@@ -111,9 +111,9 @@ final class ChatModel: ObservableObject {
                 )
                 let out = try await API.turn(body)
 
-                // 首轮，或这一轮换了照片 → 把照片挂到这条陪伴消息上显示
+                // First turn, or the photo changed this turn → attach the photo to this companion message for display
                 let showPhoto = (memoryId == nil) || out.photo_changed
-                if showPhoto { recordShown(out.memory?.id) }   // 记进"最近看过"，下次发作避开
+                if showPhoto { recordShown(out.memory?.id) }   // record into "recently seen" so the next episode avoids it
 
                 memoryId = out.memory?.id
                 shownIds = out.shown_ids
@@ -133,7 +133,7 @@ final class ChatModel: ObservableObject {
                         reasoning: out.reasoning ?? ""
                     )
                 ))
-                HistoryStore.save(id: sessionId, messages: messages)   // 每轮自动存进手机本地历史
+                HistoryStore.save(id: sessionId, messages: messages)   // auto-save to on-device history every turn
             } catch {
                 errorText = error.localizedDescription
             }

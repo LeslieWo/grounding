@@ -1,5 +1,5 @@
-"""用 gpt-4o 看照片，起草一张"回忆卡片"。
-AI 只根据画面推测，个人才知道的事（时间/人物/发生了什么）留给你补充。"""
+"""Look at a photo with gpt-4o and draft a "memory card".
+The AI only infers from what's in the frame; things only the person would know (when/who/what happened) are left for you to fill in."""
 import base64
 import io
 import os
@@ -11,25 +11,27 @@ from langchain_core.messages import SystemMessage, HumanMessage
 
 from llm_config import make_chat, struct_method
 
-# 建库(看图起草卡片)默认用更快的小模型——起草不需要 32b 的细腻，
-# 32b 留给真正需要它的陪伴对话。想改用 .env 里的 INGEST_MODEL。
+# Bank-building (drafting cards from photos) defaults to a faster small model — drafting
+# doesn't need the 32b's finesse; save the 32b for the companion conversations that truly need it.
+# Override via INGEST_MODEL in .env.
 INGEST_MODEL = os.environ.get("INGEST_MODEL", "qwen2.5vl:7b")
-# 送进模型前把图缩到这个最长边——手机照片动辄 5000+ 像素，缩到 1024 看图又快又不掉卡片质量。
+# Shrink the image to this longest side before sending it to the model — phone photos easily
+# run 5000+ pixels; at 1024 vision is fast with no drop in card quality.
 MAX_SIDE = 1024
 
 
 def _shrink_for_vision(image_bytes: bytes) -> bytes:
-    """只缩"送给模型看"的那份；原图照常存档、照常显示，不动。"""
+    """Only shrink the copy "shown to the model"; the original is archived and displayed as usual, untouched."""
     try:
         im = Image.open(io.BytesIO(image_bytes))
-        im = ImageOps.exif_transpose(im).convert("RGB")   # 先按 EXIF 摆正，模型看到的才是正的
+        im = ImageOps.exif_transpose(im).convert("RGB")   # Upright per EXIF first, so the model sees it right-side up
         if max(im.size) > MAX_SIDE:
             im.thumbnail((MAX_SIDE, MAX_SIDE))
         buf = io.BytesIO()
         im.save(buf, format="JPEG", quality=85)
         return buf.getvalue()
     except Exception:
-        return image_bytes  # 缩不动就用原图，别让建库直接挂
+        return image_bytes  # If shrinking fails, use the original — don't let bank-building die over it
 
 
 class MemoryCard(BaseModel):
@@ -74,11 +76,11 @@ def _to_dict(obj):
 
 
 def draft_memory_from_image(image_bytes: bytes, mime: str = "image/jpeg", model: str = None) -> dict:
-    """看图 -> 回忆卡片草稿(dict)。需要环境变量 OPENAI_API_KEY（可指向 z.ai）。"""
-    small = _shrink_for_vision(image_bytes)          # 先缩小，看图快很多
+    """Photo -> memory-card draft (dict). Needs the OPENAI_API_KEY env var (may point at z.ai)."""
+    small = _shrink_for_vision(image_bytes)          # Shrink first; vision gets much faster
     b64 = base64.b64encode(small).decode()
-    # json_schema 方式：本地 Ollama 的视觉模型（Qwen2.5-VL）不支持 tools，
-    # 但支持 json_schema 约束输出；OpenAI 的 gpt-4o 也支持，所以两边通吃。
+    # json_schema mode: local Ollama vision models (Qwen2.5-VL) don't support tools,
+    # but do support json_schema-constrained output; OpenAI's gpt-4o supports it too, so it works on both.
     llm = make_chat(0.4, model=model or INGEST_MODEL, disable_thinking=False).with_structured_output(MemoryCard, method=struct_method())
     result = llm.invoke([
         SystemMessage(content=SYS),

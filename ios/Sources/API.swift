@@ -1,9 +1,9 @@
 import Foundation
 
-/// 后端只是一个**无状态的 agent 大脑**：它不存你的照片，也不存你的回忆卡片。
-/// 每一轮，我们把记忆库和这次对话的状态一起发上去，它跑完一轮就忘掉。
+/// The backend is just a **stateless agent brain**: it stores neither your photos nor your memory cards.
+/// Each turn, we send up the memory library along with this conversation's state; once the turn finishes, it forgets everything.
 ///
-/// 地址和 key 来自 Config.xcconfig（不进仓库），见 Config.swift。
+/// The base URL and key come from Config.xcconfig (not checked into the repo); see Config.swift.
 enum API {
     private static var base: String { Config.apiBase }
 
@@ -13,7 +13,7 @@ enum API {
         guard !b.isEmpty, let url = URL(string: b + path) else { throw APIError.notConfigured }
         var req = URLRequest(url: url)
         req.httpMethod = method
-        req.setValue(Config.apiKey, forHTTPHeaderField: "X-API-Key")   // 没有它后端一律 401
+        req.setValue(Config.apiKey, forHTTPHeaderField: "X-API-Key")   // without it the backend always returns 401
         req.timeoutInterval = 60
         return req
     }
@@ -29,7 +29,7 @@ enum API {
         return try JSONDecoder().decode(T.self, from: data)
     }
 
-    /// 跑一轮陪伴。记忆库跟着请求一起上去。
+    /// Run one companionship turn. The memory library goes up with the request.
     static func turn(_ body: TurnIn) async throws -> TurnOut {
         var req = try request("/api/turn")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
@@ -37,13 +37,13 @@ enum API {
         return try await send(req, as: TurnOut.self)
     }
 
-    /// 上传一张照片，让视觉模型起草一张回忆卡片草稿。
-    /// 照片只穿过后端的内存（看一眼、起草、丢掉），不落盘、不留副本。
+    /// Upload a photo and have the vision model draft a memory card.
+    /// The photo only passes through the backend's memory (one look, draft, discard); it never touches disk and no copy is kept.
     static func ingest(imageData: Data) async throws -> MemoryCard {
         var req = try request("/api/ingest")
         let boundary = "Boundary-\(UUID().uuidString)"
         req.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
-        req.timeoutInterval = 120                     // 看图比说话慢，给足时间
+        req.timeoutInterval = 120                     // looking at an image is slower than chatting; give it plenty of time
 
         var body = Data()
         body.append("--\(boundary)\r\n".data(using: .utf8)!)
@@ -56,15 +56,15 @@ enum API {
         return try await send(req, as: IngestOut.self).draft
     }
 
-    // MARK: - 一次性搬家（把照片和卡片从旧后端搬回手机，搬完旧服务就可以关掉）
+    // MARK: - One-time migration (move photos and cards from the old backend back to the phone; once done, the old service can be shut down)
 
-    /// 从旧后端取回全部完整卡片。
+    /// Fetch all complete cards from the old backend.
     static func exportFromOldBackend() async throws -> [MemoryCard] {
         let req = try request("/api/export", base: Config.migrateBase, method: "GET")
         return try await send(req, as: [MemoryCard].self)
     }
 
-    /// 从旧后端取回一张照片的原始字节。
+    /// Fetch a photo's raw bytes from the old backend.
     static func photoFromOldBackend(_ id: String) async throws -> Data {
         let req = try request("/api/photo/\(id)", base: Config.migrateBase, method: "GET")
         let (data, resp) = try await URLSession.shared.data(for: req)

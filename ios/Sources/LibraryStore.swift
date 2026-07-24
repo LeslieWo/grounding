@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// 记忆库：回忆卡片存在手机 Documents/library.json，照片存在 Documents/photos/。
-/// **服务器上一份都没有。** 每一轮对话，我们把卡片带上去给 agent 读，它读完就忘。
+/// The memory library: memory cards live in the phone's Documents/library.json, photos in Documents/photos/.
+/// **The server has no copy of any of it.** Each conversation turn we carry the cards up for the agent to read; once it's done reading, it forgets.
 @MainActor
 final class LibraryStore: ObservableObject {
     @Published private(set) var cards: [MemoryCard] = []
@@ -19,7 +19,7 @@ final class LibraryStore: ObservableObject {
 
     var isEmpty: Bool { cards.isEmpty }
 
-    // MARK: - 本地读写
+    // MARK: - Local read/write
 
     func load() {
         guard let data = try? Data(contentsOf: Self.fileURL),
@@ -48,14 +48,15 @@ final class LibraryStore: ObservableObject {
         persist()
     }
 
-    // MARK: - 一次性搬家：把旧后端上的照片和卡片全部搬回手机
+    // MARK: - One-time migration: move all photos and cards from the old backend back to the phone
 
-    /// 只在第一次装上这个版本时跑一次。搬完之后旧服务就可以彻底关掉，
-    /// 照片就再也不在任何云上了——回到最初"照片不出设备"的那条线。
+    /// Runs only once, the first time this version is installed. After the move, the old service
+    /// can be shut down for good and the photos are no longer on any cloud, back to the original
+    /// "photos never leave the device" line.
     func migrateIfNeeded() async {
         guard !UserDefaults.standard.bool(forKey: migratedKey) else { return }
         guard cards.isEmpty, !Config.migrateBase.isEmpty else {
-            UserDefaults.standard.set(true, forKey: migratedKey)   // 没什么可搬的
+            UserDefaults.standard.set(true, forKey: migratedKey)   // nothing to migrate
             return
         }
 
@@ -70,7 +71,7 @@ final class LibraryStore: ObservableObject {
                     if let data = try? await API.photoFromOldBackend(card.id) {
                         PhotoCache.save(id: card.id, data: data)
                     } else {
-                        continue      // 照片没搬下来就先不收这张，下次再试
+                        continue      // if the photo didn't come down, skip this card for now and retry next time
                     }
                 }
                 got.append(card)

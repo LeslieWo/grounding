@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 历史：你陪自己走过的每一次（全存手机本地）。
+/// History: every time you walked yourself through it (all stored locally on the phone).
 struct HistoryView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var records: [SessionRecord] = []
@@ -56,7 +56,7 @@ struct HistoryView: View {
     }
 }
 
-/// 回看一次过去的对话（只读，复用聊天气泡）。
+/// Look back at a past conversation (read-only, reusing the chat bubbles).
 struct SessionDetailView: View {
     let record: SessionRecord
     var body: some View {

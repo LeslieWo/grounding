@@ -1,10 +1,12 @@
 import SwiftUI
 import PhotosUI
 
-/// 从相册加一张照片进记忆库。
+/// Add a photo from the photo library into the memory library.
 ///
-/// 流程：挑照片 → 送去后端让视觉模型起草一张卡片（照片只穿过内存，不落盘）
-///      → 你补上只有你知道的部分（时间/和谁/发生了什么）→ 存在这台手机上。
+/// Flow: pick a photo → send it to the backend so the vision model drafts a card
+///      (the photo only passes through memory, never touches disk)
+///      → you fill in the parts only you know (when / with whom / what happened)
+///      → it's stored on this phone.
 struct AddMemoryView: View {
     @EnvironmentObject private var library: LibraryStore
     @Environment(\.dismiss) private var dismiss
@@ -41,7 +43,7 @@ struct AddMemoryView: View {
         }
     }
 
-    // MARK: - 选照片
+    // MARK: - Photo picking
 
     private var picker: some View {
         VStack(spacing: 16) {
@@ -76,7 +78,7 @@ struct AddMemoryView: View {
             return
         }
         image = ui
-        let small = ui.jpegShrunk(maxSide: 1200)      // 存在手机上的那份
+        let small = ui.jpegShrunk(maxSide: 1200)      // the copy that lives on the phone
         jpeg = small
 
         drafting = true
@@ -85,7 +87,7 @@ struct AddMemoryView: View {
             draft.id = UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8).lowercased()
             card = draft
         } catch {
-            // 起草失败也别卡住她——给一张空卡片，她自己填
+            // Even if drafting fails, don't leave her stuck: give her a blank card to fill in herself
             var blank = MemoryCard(id: UUID().uuidString.replacingOccurrences(of: "-", with: "").prefix(8).lowercased())
             blank.title = ""
             card = blank
@@ -94,7 +96,7 @@ struct AddMemoryView: View {
         drafting = false
     }
 
-    // MARK: - 补充卡片
+    // MARK: - Filling in the card
 
     private func editor(_ c: MemoryCard) -> some View {
         let binding = Binding<MemoryCard>(get: { card ?? c }, set: { card = $0 })
@@ -143,7 +145,7 @@ struct AddMemoryView: View {
 }
 
 extension UIImage {
-    /// 缩到最长边不超过 maxSide 的 JPEG（手机原图动辄几 MB，没必要）。
+    /// JPEG shrunk so the longest side stays within maxSide (phone originals are easily several MB; no need for that).
     func jpegShrunk(maxSide: CGFloat, quality: CGFloat = 0.85) -> Data? {
         let longest = max(size.width, size.height)
         guard longest > 0 else { return nil }

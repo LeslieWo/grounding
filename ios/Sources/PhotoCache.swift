@@ -1,9 +1,10 @@
 import SwiftUI
 import UIKit
 
-/// 照片只存在这台手机上：Documents/photos/{id}.jpg。
-/// 后端没有任何照片，所以这里**不会**、也不能去云上拉图——除了第一次装上新版本时的一次性搬家
-/// （见 LibraryStore.migrateIfNeeded），那之后永远只读本地。
+/// Photos live only on this phone: Documents/photos/{id}.jpg.
+/// The backend has no photos at all, so this **never** pulls images from the cloud (and can't), except
+/// for the one-time migration on first install of the new version (see LibraryStore.migrateIfNeeded);
+/// after that, it reads local storage only, forever.
 enum PhotoCache {
     static let dir: URL = {
         let base = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
@@ -30,7 +31,7 @@ enum PhotoCache {
     }
 }
 
-/// 显示一张照片（永远从手机本地读，秒开）。
+/// Display a photo (always read from local storage; opens instantly).
 struct LocalPhoto: View {
     let id: String
     @State private var img: UIImage?

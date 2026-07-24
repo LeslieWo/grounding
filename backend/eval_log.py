@@ -1,11 +1,13 @@
-"""本地 outcome eval + 个人康复存档。
-每一次 panic session 记一条：既是"到底有没有起效"的诚实尺子（A/B vs 傻基线），
-也是你自己的康复档案（每次怎么好起来的）。全部只在本机 data/sessions.jsonl。
+"""Local outcome eval + personal recovery archive.
+One record per panic session: it's both the honest yardstick of "did this actually help"
+(A/B vs a dumb baseline) and your own recovery archive (how you came back each time).
+Everything lives only in local data/sessions.jsonl.
 
-诚实边界：
-- n 很小 → 早期数字是噪音，analyze() 会明说，别当结论。
-- 回归均值 → 难受到峰值本来会自然回落；只有 agent 臂高出 random 臂的那部分才是真效果。
-- 盲 → arm 对用户隐藏，避免期待偏差。
+Honesty boundaries:
+- Tiny n → early numbers are noise; analyze() says so plainly — don't treat them as conclusions.
+- Regression to the mean → distress at its peak would ebb on its own anyway; only the margin
+  by which the agent arm beats the random arm is real effect.
+- Blinding → the arm is hidden from the user, to avoid expectancy bias.
 """
 import json
 import os
@@ -19,7 +21,7 @@ BASE = os.path.dirname(os.path.abspath(__file__))
 DATA = os.path.join(BASE, "data")
 LOG = os.path.join(DATA, "sessions.jsonl")
 
-# A/B：傻基线 vs 聪明情感检索。50/50 盲分。
+# A/B: dumb baseline vs smart emotional retrieval. 50/50 blind assignment.
 ARMS = ["random", "agent"]
 
 
@@ -32,7 +34,7 @@ def new_session_id() -> str:
 
 
 def log_event(session_id: str, kind: str, **data):
-    """kind ∈ {'start','end'}。start 记 pre_suds+arm；end 记 post_suds+退出方式+对话。"""
+    """kind ∈ {'start','end'}. start records pre_suds+arm; end records post_suds + exit type + transcript."""
     os.makedirs(DATA, exist_ok=True)
     rec = {"session_id": session_id, "kind": kind, "ts": time.time(), **data}
     with open(LOG, "a", encoding="utf-8") as f:
@@ -56,7 +58,7 @@ def _load_events():
 
 
 def load_sessions():
-    """把 start/end 事件拼成每次 session 的完整记录。没 end 的 = 中途 abandon。"""
+    """Stitch start/end events into one complete record per session. No end = abandoned midway."""
     ev = _load_events()
     starts = {e["session_id"]: e for e in ev if e.get("kind") == "start"}
     ends = {e["session_id"]: e for e in ev if e.get("kind") == "end"}
@@ -131,7 +133,7 @@ def analyze():
 
 
 def journey_digest(sessions, memories) -> str:
-    """给 LLM 做纵向反思的原料：最常选的照片/情绪、平均降幅、发作时的原话、降得最多的几次。"""
+    """Raw material for the LLM's longitudinal reflection: most-chosen photos/emotions, average drop, verbatim words from episodes, the sessions with the biggest drops."""
     id2 = {m.get("id"): m for m in memories}
     completed = [s for s in sessions if s.get("completed")]
     lines = [f"总发作记录：{len(sessions)} 次；走完全程的 {len(completed)} 次。"]
